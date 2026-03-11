@@ -41,8 +41,12 @@ func printTable(info *gsq.ServerInfo) {
 	fmt.Printf("%-12s %s\n", "Address:", info.Address)
 	fmt.Printf("%-12s %d\n", "Game Port:", info.GamePort)
 	fmt.Printf("%-12s %d\n", "Query Port:", info.QueryPort)
-	fmt.Printf("%-12s %s\n", "Game:", info.Game)
-	fmt.Printf("%-12s %s\n", "Map:", info.Map)
+	if info.Game != "" {
+		fmt.Printf("%-12s %s\n", "Game:", info.Game)
+	}
+	if info.Map != "" {
+		fmt.Printf("%-12s %s\n", "Map:", info.Map)
+	}
 	fmt.Printf("%-12s %d / %d\n", "Players:", info.Players, info.MaxPlayers)
 
 	if info.Bots > 0 {

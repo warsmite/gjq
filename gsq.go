@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/0xkowalskidev/gsq/internal/protocol"
@@ -45,6 +47,7 @@ func Query(ctx context.Context, address string, port uint16, opts QueryOptions) 
 		return nil, fmt.Errorf("no protocol matched for %s:%d: %w", address, port, err)
 	}
 	inferGamePort(info)
+	resolveGameName(info)
 	return info, nil
 }
 
@@ -70,6 +73,8 @@ func queryByGame(ctx context.Context, address string, givenPort uint16, game str
 	// User gave a game port; query may have succeeded on a different (query) port
 	info.QueryPort = info.GamePort
 	info.GamePort = givenPort
+	info.Game = gc.Name
+	sanitizeInfo(info)
 
 	return info, nil
 }
@@ -179,6 +184,7 @@ func Discover(ctx context.Context, address string, opts DiscoverOptions) ([]*Ser
 				return
 			}
 			inferGamePort(info)
+			resolveGameName(info)
 			resultCh <- info
 		}(p)
 	}
@@ -228,6 +234,35 @@ func inferGamePort(info *ServerInfo) {
 		info.GamePort = queriedPort - offset
 		info.QueryPort = queriedPort
 	}
+}
+
+var tagRegex = regexp.MustCompile(`<[^>]+>`)
+
+func sanitize(s string) string {
+	return strings.TrimSpace(tagRegex.ReplaceAllString(s, ""))
+}
+
+func sanitizeInfo(info *ServerInfo) {
+	info.Name = sanitize(info.Name)
+	info.Map = sanitize(info.Map)
+}
+
+// resolveGameName sets the Game field from our registry if the AppID matches,
+// otherwise sanitizes the server-reported value.
+func resolveGameName(info *ServerInfo) {
+	var gc *GameConfig
+	if info.AppID != 0 {
+		gc = LookupGameByAppID(info.AppID)
+	} else if info.Protocol == "minecraft" {
+		gc = LookupGame("minecraft")
+	}
+
+	if gc != nil {
+		info.Game = gc.Name
+	} else {
+		info.Game = sanitize(info.Game)
+	}
+	sanitizeInfo(info)
 }
 
 // resolveHost resolves a hostname to an IP once so concurrent queries don't repeat DNS.
