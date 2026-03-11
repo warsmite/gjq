@@ -27,7 +27,16 @@ func Query(ctx context.Context, address string, port uint16, opts QueryOptions) 
 		return queryByGame(ctx, address, port, opts.Game)
 	}
 
-	return detectProtocol(ctx, address, port)
+	var attempts []attempt
+	for name := range protocol.All() {
+		attempts = append(attempts, attempt{port: port, protocol: name})
+	}
+
+	info, err := raceQuery(ctx, address, attempts)
+	if err != nil {
+		return nil, fmt.Errorf("no protocol matched for %s:%d: %w", address, port, err)
+	}
+	return info, nil
 }
 
 func queryByGame(ctx context.Context, address string, givenPort uint16, game string) (*ServerInfo, error) {
@@ -37,47 +46,72 @@ func queryByGame(ctx context.Context, address string, givenPort uint16, game str
 	}
 
 	offset := gc.DefaultQueryPort - gc.DefaultGamePort
+	candidatePorts := dedupPorts(givenPort, givenPort+offset, gc.DefaultQueryPort)
 
-	seen := make(map[uint16]bool)
-	var queryPorts []uint16
-
-	addCandidate := func(qp uint16) {
-		if !seen[qp] {
-			seen[qp] = true
-			queryPorts = append(queryPorts, qp)
-		}
+	var attempts []attempt
+	for _, p := range candidatePorts {
+		attempts = append(attempts, attempt{port: p, protocol: gc.Protocol})
 	}
 
-	addCandidate(givenPort)                // Maybe the user provided the query port directly
-	addCandidate(givenPort + offset)       // User provided the game port
-	addCandidate(gc.DefaultQueryPort)      // Custom game port but default query port
-
-	type result struct {
-		info      *ServerInfo
-		queryPort uint16
-		err       error
+	info, err := raceQuery(ctx, address, attempts)
+	if err != nil {
+		return nil, fmt.Errorf("no query port worked for %s (game %s): %w", address, game, err)
 	}
 
+	// info.Port is the query port that succeeded (set by protocol implementation)
+	info.Port = resolveGamePort(info, info.Port, givenPort, gc)
+	info.GamePort = 0
+	return info, nil
+}
+
+func resolveGamePort(info *ServerInfo, matchedQueryPort, givenPort uint16, gc *GameConfig) uint16 {
+	if info.GamePort != 0 {
+		return info.GamePort
+	}
+
+	offset := gc.DefaultQueryPort - gc.DefaultGamePort
+
+	switch matchedQueryPort {
+	case givenPort + offset:
+		return givenPort
+	case givenPort:
+		return givenPort - offset
+	case gc.DefaultQueryPort:
+		return gc.DefaultGamePort
+	default:
+		return givenPort
+	}
+}
+
+type attempt struct {
+	port     uint16
+	protocol string
+}
+
+// raceQuery tries all attempts concurrently, returning the first successful result.
+func raceQuery(ctx context.Context, address string, attempts []attempt) (*ServerInfo, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	resultCh := make(chan result, len(queryPorts))
+	type result struct {
+		info *ServerInfo
+		err  error
+	}
+
+	resultCh := make(chan result, len(attempts))
 	var wg sync.WaitGroup
 
-	for _, qp := range queryPorts {
+	for _, a := range attempts {
 		wg.Add(1)
-		go func(qp uint16) {
+		go func(a attempt) {
 			defer wg.Done()
-			slog.Debug("trying query port candidate", "queryPort", qp, "game", game)
-			info, err := queryWithProtocol(ctx, address, qp, gc.Protocol)
+			info, err := queryWithProtocol(ctx, address, a.port, a.protocol)
 			if err != nil {
-				slog.Debug("candidate failed", "queryPort", qp, "error", err)
 				resultCh <- result{err: err}
 				return
 			}
-			slog.Debug("candidate succeeded", "queryPort", qp)
-			resultCh <- result{info: info, queryPort: qp}
-		}(qp)
+			resultCh <- result{info: info}
+		}(a)
 	}
 
 	go func() {
@@ -92,35 +126,9 @@ func queryByGame(ctx context.Context, address string, givenPort uint16, game str
 			continue
 		}
 		cancel()
-		r.info.Port = resolveGamePort(r.info, r.queryPort, givenPort, gc)
-		r.info.GamePort = 0
 		return r.info, nil
 	}
-
-	return nil, fmt.Errorf("no query port worked for %s (game %s): %w", address, game, lastErr)
-}
-
-func resolveGamePort(info *ServerInfo, matchedQueryPort, givenPort uint16, gc *GameConfig) uint16 {
-	// Prefer the protocol-reported game port when available (e.g. from A2S_INFO EDF)
-	if info.GamePort != 0 {
-		return info.GamePort
-	}
-
-	offset := gc.DefaultQueryPort - gc.DefaultGamePort
-
-	switch matchedQueryPort {
-	case givenPort + offset:
-		// Offset candidate matched — user gave the game port
-		return givenPort
-	case givenPort:
-		// Direct candidate matched — user likely gave the query port
-		return givenPort - offset
-	case gc.DefaultQueryPort:
-		// Default query port matched — use the default game port
-		return gc.DefaultGamePort
-	default:
-		return givenPort
-	}
+	return nil, lastErr
 }
 
 func queryWithProtocol(ctx context.Context, address string, port uint16, protoName string) (*ServerInfo, error) {
@@ -130,59 +138,13 @@ func queryWithProtocol(ctx context.Context, address string, port uint16, protoNa
 	}
 
 	slog.Debug("querying server", "protocol", protoName, "address", address, "port", port)
-	return q.Query(ctx, address, port)
-}
-
-// detectProtocol tries all registered protocols concurrently and returns the first valid response.
-func detectProtocol(ctx context.Context, address string, port uint16) (*ServerInfo, error) {
-	all := protocol.All()
-	if len(all) == 0 {
-		return nil, fmt.Errorf("no protocols registered")
+	info, err := q.Query(ctx, address, port)
+	if err != nil {
+		slog.Debug("query failed", "protocol", protoName, "address", address, "port", port, "error", err)
+		return nil, err
 	}
-
-	type result struct {
-		info *ServerInfo
-		err  error
-	}
-
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	resultCh := make(chan result, len(all))
-	var wg sync.WaitGroup
-
-	for name, querier := range all {
-		wg.Add(1)
-		go func(name string, q protocol.Querier) {
-			defer wg.Done()
-			slog.Debug("trying protocol", "protocol", name, "address", address, "port", port)
-			info, err := q.Query(ctx, address, port)
-			if err != nil {
-				slog.Debug("protocol failed", "protocol", name, "error", err)
-				resultCh <- result{err: err}
-				return
-			}
-			slog.Debug("protocol succeeded", "protocol", name)
-			resultCh <- result{info: info}
-		}(name, querier)
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultCh)
-	}()
-
-	var lastErr error
-	for r := range resultCh {
-		if r.err != nil {
-			lastErr = r.err
-			continue
-		}
-		cancel()
-		return r.info, nil
-	}
-
-	return nil, fmt.Errorf("no protocol matched for %s:%d: %w", address, port, lastErr)
+	slog.Debug("query succeeded", "protocol", protoName, "address", address, "port", port)
+	return info, nil
 }
 
 // Discover scans a host for game servers by probing known default ports
@@ -197,15 +159,10 @@ func Discover(ctx context.Context, address string, opts DiscoverOptions) ([]*Ser
 	ports := collectPorts(opts.PortRanges)
 	protocols := protocol.All()
 
-	type probe struct {
-		port     uint16
-		protocol string
-	}
-
-	var probes []probe
+	var probes []attempt
 	for _, port := range ports {
 		for name := range protocols {
-			probes = append(probes, probe{port: port, protocol: name})
+			probes = append(probes, attempt{port: port, protocol: name})
 		}
 	}
 
@@ -213,12 +170,11 @@ func Discover(ctx context.Context, address string, opts DiscoverOptions) ([]*Ser
 	sem := make(chan struct{}, 20)
 
 	for _, p := range probes {
-		go func(p probe) {
+		go func(p attempt) {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			info, err := queryWithProtocol(ctx, address, p.port, p.protocol)
 			if err != nil {
-				slog.Debug("scan miss", "port", p.port, "protocol", p.protocol, "error", err)
 				resultCh <- nil
 				return
 			}
@@ -226,7 +182,6 @@ func Discover(ctx context.Context, address string, opts DiscoverOptions) ([]*Ser
 				info.Port = info.GamePort
 				info.GamePort = 0
 			}
-			slog.Debug("scan hit", "port", p.port, "protocol", p.protocol)
 			resultCh <- info
 		}(p)
 	}
@@ -241,33 +196,32 @@ func Discover(ctx context.Context, address string, opts DiscoverOptions) ([]*Ser
 	return servers, nil
 }
 
-// collectPorts returns a deduplicated list of ports to probe.
-// If port ranges are provided, uses those. Otherwise, collects all
-// unique default ports from the game registry.
 func collectPorts(portRanges []PortRange) []uint16 {
+	var ports []uint16
+
 	if len(portRanges) > 0 {
-		seen := make(map[uint16]bool)
-		var ports []uint16
 		for _, pr := range portRanges {
 			for port := pr.Start; port <= pr.End; port++ {
-				if !seen[port] {
-					seen[port] = true
-					ports = append(ports, port)
-				}
-			}
-		}
-		return ports
-	}
-
-	seen := make(map[uint16]bool)
-	var ports []uint16
-	for _, g := range SupportedGames() {
-		for _, port := range []uint16{g.DefaultQueryPort, g.DefaultGamePort} {
-			if !seen[port] {
-				seen[port] = true
 				ports = append(ports, port)
 			}
 		}
+	} else {
+		for _, g := range SupportedGames() {
+			ports = append(ports, g.DefaultQueryPort, g.DefaultGamePort)
+		}
 	}
-	return ports
+
+	return dedupPorts(ports...)
+}
+
+func dedupPorts(ports ...uint16) []uint16 {
+	seen := make(map[uint16]bool, len(ports))
+	var result []uint16
+	for _, p := range ports {
+		if !seen[p] {
+			seen[p] = true
+			result = append(result, p)
+		}
+	}
+	return result
 }
