@@ -163,7 +163,7 @@ func parseInfoResponse(data []byte) (*protocol.ServerInfo, error) {
 
 	version, _ := readString(r)
 
-	return &protocol.ServerInfo{
+	info := &protocol.ServerInfo{
 		Protocol:    "source",
 		Name:        name,
 		Map:         mapName,
@@ -176,7 +176,18 @@ func parseInfoResponse(data []byte) (*protocol.ServerInfo, error) {
 		Visibility:  visibilityString(fields.Visibility),
 		VAC:         fields.VAC == 1,
 		Version:     version,
-	}, nil
+	}
+
+	if edf, err := r.ReadByte(); err == nil {
+		if edf&0x80 != 0 {
+			var gamePort uint16
+			if err := binary.Read(r, binary.LittleEndian, &gamePort); err == nil {
+				info.GamePort = gamePort
+			}
+		}
+	}
+
+	return info, nil
 }
 
 func queryPlayers(conn net.Conn) ([]protocol.PlayerInfo, error) {

@@ -44,6 +44,7 @@ type ServerInfo struct {
 	Ping        Duration     `json:"ping"`
 	Address     string       `json:"address"`
 	Port        uint16       `json:"port"`
+	GamePort    uint16       `json:"gamePort,omitempty"`
 	PlayerList  []PlayerInfo `json:"playerList,omitempty"`
 }
 

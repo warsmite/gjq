@@ -53,8 +53,9 @@ func queryByGame(ctx context.Context, address string, givenPort uint16, game str
 	addCandidate(gc.DefaultQueryPort)      // Custom game port but default query port
 
 	type result struct {
-		info *ServerInfo
-		err  error
+		info      *ServerInfo
+		queryPort uint16
+		err       error
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -75,7 +76,7 @@ func queryByGame(ctx context.Context, address string, givenPort uint16, game str
 				return
 			}
 			slog.Debug("candidate succeeded", "queryPort", qp)
-			resultCh <- result{info: info}
+			resultCh <- result{info: info, queryPort: qp}
 		}(qp)
 	}
 
@@ -91,11 +92,35 @@ func queryByGame(ctx context.Context, address string, givenPort uint16, game str
 			continue
 		}
 		cancel()
-		r.info.Port = givenPort
+		r.info.Port = resolveGamePort(r.info, r.queryPort, givenPort, gc)
+		r.info.GamePort = 0
 		return r.info, nil
 	}
 
 	return nil, fmt.Errorf("no query port worked for %s (game %s): %w", address, game, lastErr)
+}
+
+func resolveGamePort(info *ServerInfo, matchedQueryPort, givenPort uint16, gc *GameConfig) uint16 {
+	// Prefer the protocol-reported game port when available (e.g. from A2S_INFO EDF)
+	if info.GamePort != 0 {
+		return info.GamePort
+	}
+
+	offset := gc.DefaultQueryPort - gc.DefaultGamePort
+
+	switch matchedQueryPort {
+	case givenPort + offset:
+		// Offset candidate matched — user gave the game port
+		return givenPort
+	case givenPort:
+		// Direct candidate matched — user likely gave the query port
+		return givenPort - offset
+	case gc.DefaultQueryPort:
+		// Default query port matched — use the default game port
+		return gc.DefaultGamePort
+	default:
+		return givenPort
+	}
 }
 
 func queryWithProtocol(ctx context.Context, address string, port uint16, protoName string) (*ServerInfo, error) {
@@ -210,7 +235,12 @@ func Discover(ctx context.Context, address string, opts DiscoverOptions) ([]*Ser
 				resultCh <- nil
 				return
 			}
-			info.Port = p.gamePort
+			if info.GamePort != 0 {
+				info.Port = info.GamePort
+				info.GamePort = 0
+			} else {
+				info.Port = p.gamePort
+			}
 			slog.Debug("scan hit", "port", p.queryPort, "protocol", p.protocol)
 			resultCh <- info
 		}(p)
