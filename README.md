@@ -16,9 +16,22 @@ gsq --game rust 192.168.1.100                  # specify game, use default port
 gsq --players --game ark 192.168.1.100:27015   # include player list
 gsq --json --game minecraft play.hypixel.net   # JSON output
 gsq scan 192.168.1.100                         # find all game servers on a host
-gsq scan --players --ports 25000-26000 192.168.1.100  # scan with player lists
+gsq scan --ports 25000-26000 192.168.1.100     # scan custom port range
 gsq games                                      # list supported games
 ```
+
+Output includes the address you queried, the inferred game port (what players connect to), and the query port (what the protocol responded on):
+
+```
+Name:        Rust Server
+Address:     192.168.1.100
+Game Port:   28015
+Query Port:  28017
+Game:        Rust
+...
+```
+
+> **Note:** The game port is inferred from the query port using the known offset for each game (e.g. Rust query port = game port + 2). For servers with non-standard port layouts, such as containerized servers where port mappings don't preserve the offset, the displayed game port may be incorrect. The query port is always accurate.
 
 ## Library
 
