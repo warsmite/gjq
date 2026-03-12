@@ -13,6 +13,7 @@ import (
 
 	// Register protocol implementations
 	_ "github.com/0xkowalskidev/gsq/internal/protocol/minecraft"
+	_ "github.com/0xkowalskidev/gsq/internal/protocol/raknet"
 	_ "github.com/0xkowalskidev/gsq/internal/protocol/source"
 )
 
