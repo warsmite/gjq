@@ -45,7 +45,7 @@ servers, err := gsq.Discover(ctx, "192.168.1.100", gsq.DiscoverOptions{})
 
 ## EOS (Epic Online Services)
 
-Some games (ARK: Survival Ascended, Squad, The Isle: EVRIMA) use Epic's matchmaking API
+Some games (ARK: Survival Ascended, Palworld, Squad, The Isle: EVRIMA) use Epic's matchmaking API
 instead of a direct query protocol. gsq ships with default credentials for these games,
 but game updates may rotate them.
 

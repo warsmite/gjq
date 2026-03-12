@@ -41,6 +41,13 @@ var gameRegistry = []GameConfig{
 		EOSAttributes: map[string]string{"name": "SERVERNAME_s", "password": "PASSWORD_b", "version": "GAMEVERSION_s"},
 	},
 	{
+		Slug: "palworld", Name: "Palworld", Aliases: []string{"pw"},
+		DefaultGamePort: 8211, DefaultQueryPort: 8211, Protocol: "eos",
+		EOSClientID: "xyza78916PZ5DF0fAahu4tnrKKyFpqRE", EOSClientSecret: "j0NapLEPm3R3EOrlQiM8cRLKq3Rt02ZVVwT0SkZstSg",
+		EOSDeploymentID: "0a18471f93d448e2a1f60e47e03d3413", EOSExternalAuth: true,
+		EOSAttributes: map[string]string{"name": "NAME_s", "map": "MAPNAME_s", "password": "ISPASSWORD_b", "version": "VERSION_s"},
+	},
+	{
 		Slug: "the-isle-evrima", Name: "The Isle: EVRIMA", Aliases: []string{"evrima"},
 		DefaultGamePort: 7777, DefaultQueryPort: 7777, Protocol: "eos",
 		EOSClientID: "xyza7891gk5PRo3J7G9puCJGFJjmEguW", EOSClientSecret: "pKWl6t5i9NJK8gTpVlAxzENZ65P8hYzodV8Dqe5Rlc8",
