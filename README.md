@@ -63,14 +63,8 @@ credentials from the game's files or find them on community resources like openg
 
 ## Terraria (TShock)
 
-Terraria support requires the [TShock](https://github.com/Pryaxis/TShock) server mod. Vanilla
-Terraria servers have no external query protocol. gsq queries TShock's REST API on port 7878
-(the `/status` endpoint, which requires no token).
-
-```bash
-gsq --game terraria 192.168.1.100           # queries TShock REST API on port 7878
-gsq --game terraria 192.168.1.100:7900      # custom REST API port
-```
+Requires [TShock](https://github.com/Pryaxis/TShock) — vanilla Terraria has no query protocol.
+The server must have `RestApiEnabled: true` in its TShock config and query port must be open.
 
 ## License
 
