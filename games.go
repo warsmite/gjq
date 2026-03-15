@@ -1,5 +1,7 @@
 package gsq
 
+import "github.com/0xkowalskidev/gsq/internal/protocol"
+
 type GameConfig struct {
 	Slug             string
 	Name             string
@@ -8,17 +10,12 @@ type GameConfig struct {
 	DefaultGamePort  uint16
 	DefaultQueryPort uint16
 	Protocol         string
-	EOSClientID      string
-	EOSClientSecret  string
-	EOSDeploymentID  string
-	EOSExternalAuth  bool
-	EOSWildcard      bool
-	EOSAttributes    map[string]string
+	ProtocolConfig   any // protocol-specific config (e.g. *protocol.EOSConfig), nil for most games
 }
 
 var gameRegistry = []GameConfig{
 	// Minecraft
-	{Slug: "minecraft", Name: "Minecraft", Aliases: []string{"mc"}, DefaultGamePort: 25565, DefaultQueryPort: 25565, Protocol: "minecraft"},
+	{Slug: "minecraft-java", Name: "Minecraft: Java Edition", Aliases: []string{"minecraft", "mc"}, DefaultGamePort: 25565, DefaultQueryPort: 25565, Protocol: "minecraft"},
 	{Slug: "minecraft-bedrock", Name: "Minecraft: Bedrock Edition", Aliases: []string{"mcbe", "bedrock"}, DefaultGamePort: 19132, DefaultQueryPort: 19132, Protocol: "raknet"},
 
 	// EOS (Epic Online Services)
@@ -29,30 +26,38 @@ var gameRegistry = []GameConfig{
 	{
 		Slug: "ark-survival-ascended", Name: "ARK: Survival Ascended", Aliases: []string{"asa"},
 		DefaultGamePort: 7777, DefaultQueryPort: 7777, Protocol: "eos",
-		EOSClientID: "xyza7891muomRmynIIHaJB9COBKkwj6n", EOSClientSecret: "PP5UGxysEieNfSrEicaD1N2Bb3TdXuD7xHYcsdUHZ7s",
-		EOSDeploymentID: "ad9a8feffb3b4b2ca315546f038c3ae2", EOSWildcard: true,
-		EOSAttributes: map[string]string{"name": "CUSTOMSERVERNAME_s", "map": "MAPNAME_s", "password": "SERVERPASSWORD_b", "version": "BUILDID_s"},
+		ProtocolConfig: &protocol.EOSConfig{
+			ClientID: "xyza7891muomRmynIIHaJB9COBKkwj6n", ClientSecret: "PP5UGxysEieNfSrEicaD1N2Bb3TdXuD7xHYcsdUHZ7s",
+			DeploymentID: "ad9a8feffb3b4b2ca315546f038c3ae2", UseWildcard: true,
+			Attributes: map[string]string{"name": "CUSTOMSERVERNAME_s", "map": "MAPNAME_s", "password": "SERVERPASSWORD_b", "version": "BUILDID_s"},
+		},
 	},
 	{
 		Slug: "squad", Name: "Squad", Aliases: []string{},
 		DefaultGamePort: 7787, DefaultQueryPort: 7787, Protocol: "eos",
-		EOSClientID: "xyza7891J7d3GU8ZIwCoC5xdBsdoqVWA", EOSClientSecret: "4SLVBqAm09q776SIlQRTD6moM/bnGAWhDSqOxJAIS0s",
-		EOSDeploymentID: "5dee4062a90b42cd98fcad618b6636c2", EOSExternalAuth: true,
-		EOSAttributes: map[string]string{"name": "SERVERNAME_s", "password": "PASSWORD_b", "version": "GAMEVERSION_s"},
+		ProtocolConfig: &protocol.EOSConfig{
+			ClientID: "xyza7891J7d3GU8ZIwCoC5xdBsdoqVWA", ClientSecret: "4SLVBqAm09q776SIlQRTD6moM/bnGAWhDSqOxJAIS0s",
+			DeploymentID: "5dee4062a90b42cd98fcad618b6636c2", UseExternalAuth: true,
+			Attributes: map[string]string{"name": "SERVERNAME_s", "password": "PASSWORD_b", "version": "GAMEVERSION_s"},
+		},
 	},
 	{
 		Slug: "palworld", Name: "Palworld", Aliases: []string{"pw"},
 		DefaultGamePort: 8211, DefaultQueryPort: 8211, Protocol: "eos",
-		EOSClientID: "xyza78916PZ5DF0fAahu4tnrKKyFpqRE", EOSClientSecret: "j0NapLEPm3R3EOrlQiM8cRLKq3Rt02ZVVwT0SkZstSg",
-		EOSDeploymentID: "0a18471f93d448e2a1f60e47e03d3413", EOSExternalAuth: true,
-		EOSAttributes: map[string]string{"name": "NAME_s", "map": "MAPNAME_s", "password": "ISPASSWORD_b", "version": "VERSION_s"},
+		ProtocolConfig: &protocol.EOSConfig{
+			ClientID: "xyza78916PZ5DF0fAahu4tnrKKyFpqRE", ClientSecret: "j0NapLEPm3R3EOrlQiM8cRLKq3Rt02ZVVwT0SkZstSg",
+			DeploymentID: "0a18471f93d448e2a1f60e47e03d3413", UseExternalAuth: true,
+			Attributes: map[string]string{"name": "NAME_s", "map": "MAPNAME_s", "password": "ISPASSWORD_b", "version": "VERSION_s"},
+		},
 	},
 	{
 		Slug: "the-isle-evrima", Name: "The Isle: EVRIMA", Aliases: []string{"evrima"},
 		DefaultGamePort: 7777, DefaultQueryPort: 7777, Protocol: "eos",
-		EOSClientID: "xyza7891gk5PRo3J7G9puCJGFJjmEguW", EOSClientSecret: "pKWl6t5i9NJK8gTpVlAxzENZ65P8hYzodV8Dqe5Rlc8",
-		EOSDeploymentID: "6db6bea492f94b1bbdfcdfe3e4f898dc",
-		EOSAttributes:   map[string]string{"name": "SERVERNAME_s", "map": "MAP_NAME_s", "version": "SERVER_VERSION_s"},
+		ProtocolConfig: &protocol.EOSConfig{
+			ClientID: "xyza7891gk5PRo3J7G9puCJGFJjmEguW", ClientSecret: "pKWl6t5i9NJK8gTpVlAxzENZ65P8hYzodV8Dqe5Rlc8",
+			DeploymentID: "6db6bea492f94b1bbdfcdfe3e4f898dc",
+			Attributes:   map[string]string{"name": "SERVERNAME_s", "map": "MAP_NAME_s", "version": "SERVER_VERSION_s"},
+		},
 	},
 
 	// TShock (Terraria with TShock mod — vanilla Terraria has no query protocol)
@@ -97,6 +102,28 @@ var gameRegistry = []GameConfig{
 	{Slug: "battalion-1944", Name: "Battalion 1944", Aliases: []string{"battalion"}, AppID: 489940, DefaultGamePort: 7777, DefaultQueryPort: 7780, Protocol: "source"},
 	{Slug: "starbound", Name: "Starbound", Aliases: []string{}, AppID: 211820, DefaultGamePort: 21025, DefaultQueryPort: 21025, Protocol: "source"},
 }
+
+// Port indexes for fast lookup — built once at init.
+var (
+	queryPortIndex map[uint16][]*GameConfig
+	gamePortIndex  map[uint16][]*GameConfig
+)
+
+func init() {
+	queryPortIndex = make(map[uint16][]*GameConfig)
+	gamePortIndex = make(map[uint16][]*GameConfig)
+	for i := range gameRegistry {
+		g := &gameRegistry[i]
+		queryPortIndex[g.DefaultQueryPort] = append(queryPortIndex[g.DefaultQueryPort], g)
+		gamePortIndex[g.DefaultGamePort] = append(gamePortIndex[g.DefaultGamePort], g)
+	}
+}
+
+// GamesWithQueryPort returns games that use the given port as their default query port.
+func GamesWithQueryPort(port uint16) []*GameConfig { return queryPortIndex[port] }
+
+// GamesWithGamePort returns games that use the given port as their default game port.
+func GamesWithGamePort(port uint16) []*GameConfig { return gamePortIndex[port] }
 
 // SupportedGames returns all registered game configs.
 func SupportedGames() []GameConfig {

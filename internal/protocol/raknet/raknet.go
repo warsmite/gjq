@@ -99,7 +99,6 @@ func parsePong(buf []byte, address string, port uint16, ping time.Duration) (*pr
 		MaxPlayers: maxPlayers,
 		Version:    fields[3],
 		Ping:       protocol.Duration{Duration: ping},
-		Address:    fmt.Sprintf("%s:%d", address, port),
 		GamePort:   port,
 		QueryPort:  port,
 	}

@@ -80,7 +80,6 @@ func (q *MinecraftQuerier) Query(ctx context.Context, address string, port uint1
 		Players:    status.Players.Online,
 		MaxPlayers: status.Players.Max,
 		Version:    status.Version.Name,
-		Address:    address,
 		GamePort:   port,
 		QueryPort:  port,
 	}
