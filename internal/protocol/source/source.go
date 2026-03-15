@@ -59,7 +59,6 @@ func (q *SourceQuerier) Query(ctx context.Context, address string, port uint16, 
 	}
 
 	info.Ping = protocol.Duration{Duration: ping}
-	info.Address = address
 	info.GamePort = port
 	info.QueryPort = port
 

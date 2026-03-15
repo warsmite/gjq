@@ -55,7 +55,6 @@ func (q *eosQuerier) Query(ctx context.Context, address string, port uint16, opt
 
 	info := mapSession(session, cfg.Attributes)
 	info.Protocol = "eos"
-	info.Address = address
 	info.GamePort = port
 	info.QueryPort = port
 	info.Ping = protocol.Duration{Duration: ping}

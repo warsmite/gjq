@@ -11,14 +11,19 @@ go install github.com/0xkowalskidev/gsq/cmd/gsq@latest
 ## Usage
 
 ```bash
-gsq 192.168.1.100:27015                       # auto-detect protocol
-gsq --game rust 192.168.1.100                  # specify game, use default port
-gsq --players --game ark 192.168.1.100:27015   # include player list
-gsq --json --game minecraft play.hypixel.net   # JSON output
-gsq scan 192.168.1.100                         # find all game servers on a host
-gsq scan --ports 25000-26000 192.168.1.100     # scan custom port range
-gsq games                                      # list supported games
+gsq --game rust 192.168.1.100:28017          # game + query port (fastest)
+gsq 192.168.1.100:28017                      # auto-detect protocol
+gsq --game rust 192.168.1.100                # infer default query port from game
+gsq 192.168.1.100:28015                      # auto-detect with port derivation
+gsq --direct 192.168.1.100:28017             # skip port derivation, query exact port
+gsq --players --game ark 192.168.1.100:27015 # include player list
+gsq --json --game minecraft play.hypixel.net # JSON output
+gsq games                                    # list supported games
+gsq scan 192.168.1.100                       # find servers on known query ports
+gsq scan --ports 25000-26000 192.168.1.100   # scan a custom port range
 ```
+
+> **Tip:** Use `--direct` when you know the exact query port. This skips all port derivation and gives the fastest, most predictable result.
 
 Output includes the address you queried, the inferred game port (what players connect to), and the query port (what the protocol responded on):
 
@@ -40,8 +45,11 @@ import "github.com/0xkowalskidev/gsq"
 
 server, err := gsq.Query(ctx, "play.hypixel.net", 25565, gsq.QueryOptions{Game: "minecraft"})
 server, err := gsq.Query(ctx, "192.168.1.100", 27015, gsq.QueryOptions{Game: "ark", Players: true})
+server, err := gsq.Query(ctx, "192.168.1.100", 28017, gsq.QueryOptions{Game: "rust", Direct: true})
 servers, err := gsq.Discover(ctx, "192.168.1.100", gsq.DiscoverOptions{})
 ```
+
+Set `Direct: true` when you know the exact query port to skip port derivation.
 
 ## EOS (Epic Online Services)
 

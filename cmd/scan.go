@@ -19,7 +19,7 @@ func NewScanCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "scan [flags] host",
 		Short: "Scan a host for game servers",
-		Long:  "Probes all known game server ports (or a custom range) to find running servers.",
+		Long:  "Probes all known game server ports (or a custom range) to find running servers.\nEOS-based games (ARK: Survival Ascended, Squad, Palworld, etc.) require --game and cannot be discovered via scan.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			host := args[0]
