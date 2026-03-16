@@ -67,6 +67,9 @@ func printTable(info *gsq.ServerInfo) {
 	if info.Version != "" {
 		fmt.Printf("%-12s %s\n", "Version:", info.Version)
 	}
+	if info.Keywords != "" {
+		fmt.Printf("%-12s %s\n", "Keywords:", info.Keywords)
+	}
 	fmt.Printf("%-12s %s\n", "Protocol:", info.Protocol)
 	fmt.Printf("%-12s %s\n", "Ping:", info.Ping.Round(time.Millisecond).String())
 

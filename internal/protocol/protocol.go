@@ -41,6 +41,7 @@ type ServerInfo struct {
 	Visibility  string       `json:"visibility,omitempty"`
 	VAC         bool         `json:"vac,omitempty"`
 	Version     string       `json:"version,omitempty"`
+	Keywords    string       `json:"keywords,omitempty"`
 	AppID       uint32       `json:"appId,omitempty"`
 	Ping        Duration     `json:"ping"`
 	Address     string       `json:"address"`

@@ -6,7 +6,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
+	"sort"
 	"time"
 
 	"github.com/0xkowalskidev/gsq/internal/protocol"
@@ -20,6 +22,9 @@ const (
 	a2sPlayerResponse = 0x44
 
 	challengeResponse = 0x41
+
+	singlePacketHeader = 0xFFFFFFFF
+	splitPacketHeader  = 0xFFFFFFFE
 )
 
 var a2sInfoPayload = append(
@@ -63,15 +68,13 @@ func (q *SourceQuerier) Query(ctx context.Context, address string, port uint16, 
 	info.QueryPort = port
 
 	if opts.Players {
-		// Short deadline for player query — some servers don't respond to it
-		playerDeadline := time.Now().Add(200 * time.Millisecond)
-		if playerDeadline.After(deadline) {
-			playerDeadline = deadline
-		}
-		conn.SetDeadline(playerDeadline)
+		// Use remaining context deadline for player query. Some servers don't
+		// respond to A2S_PLAYER at all, so the error is swallowed below.
+		conn.SetDeadline(deadline)
 
 		players, err := queryPlayers(conn)
 		if err != nil {
+			slog.Debug("a2s_player query failed", "error", err)
 			return info, nil
 		}
 		info.PlayerList = players
@@ -80,30 +83,117 @@ func (q *SourceQuerier) Query(ctx context.Context, address string, port uint16, 
 	return info, nil
 }
 
+// readResponse reads a single or multi-packet response from the connection.
+// Multi-packet responses (header 0xFEFFFFFF) are reassembled from fragments.
+func readResponse(conn net.Conn) ([]byte, error) {
+	buf := make([]byte, 4096)
+	n, err := conn.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+	if n < 4 {
+		return nil, fmt.Errorf("response too short: %d bytes", n)
+	}
+
+	header := binary.LittleEndian.Uint32(buf[:4])
+	if header == singlePacketHeader {
+		return buf[4:n], nil
+	}
+	if header != splitPacketHeader {
+		return nil, fmt.Errorf("unexpected header: 0x%08x", header)
+	}
+
+	// Multi-packet response
+	return readSplitResponse(conn, buf[:n])
+}
+
+func readSplitResponse(conn net.Conn, firstPacket []byte) ([]byte, error) {
+	type fragment struct {
+		number  byte
+		payload []byte
+	}
+
+	parseFragment := func(pkt []byte) (requestID int32, total byte, frag fragment, err error) {
+		if len(pkt) < 12 {
+			return 0, 0, fragment{}, fmt.Errorf("split packet too short: %d bytes", len(pkt))
+		}
+		r := bytes.NewReader(pkt[4:]) // skip 0xFFFFFFFE header
+		binary.Read(r, binary.LittleEndian, &requestID)
+		total, _ = r.ReadByte()
+		number, _ := r.ReadByte()
+		r.Seek(2, io.SeekCurrent) // skip max packet size (Source engine split format)
+		payload := make([]byte, r.Len())
+		r.Read(payload)
+		return requestID, total, fragment{number: number, payload: payload}, nil
+	}
+
+	reqID, total, first, err := parseFragment(firstPacket)
+	if err != nil {
+		return nil, err
+	}
+
+	slog.Debug("a2s: split response", "requestID", reqID, "total", total, "received", first.number)
+
+	fragments := make([]fragment, 0, total)
+	fragments = append(fragments, first)
+
+	buf := make([]byte, 4096)
+	for len(fragments) < int(total) {
+		n, err := conn.Read(buf)
+		if err != nil {
+			return nil, fmt.Errorf("read split packet %d/%d: %w", len(fragments)+1, total, err)
+		}
+
+		_, _, frag, err := parseFragment(buf[:n])
+		if err != nil {
+			return nil, err
+		}
+		fragments = append(fragments, frag)
+	}
+
+	// Reassemble in order
+	sort.Slice(fragments, func(i, j int) bool {
+		return fragments[i].number < fragments[j].number
+	})
+
+	var assembled bytes.Buffer
+	for _, f := range fragments {
+		assembled.Write(f.payload)
+	}
+
+	// Assembled data starts with the same format as single-packet (0xFFFFFFFF + type byte)
+	data := assembled.Bytes()
+	if len(data) < 5 {
+		return nil, fmt.Errorf("reassembled response too short: %d bytes", len(data))
+	}
+	// Skip the inner 0xFFFFFFFF header
+	if binary.LittleEndian.Uint32(data[:4]) == singlePacketHeader {
+		return data[4:], nil
+	}
+	return data, nil
+}
+
 func queryInfo(conn net.Conn) (*protocol.ServerInfo, time.Duration, error) {
 	start := time.Now()
 	if _, err := conn.Write(a2sInfoPayload); err != nil {
 		return nil, 0, fmt.Errorf("send request: %w", err)
 	}
 
-	buf := make([]byte, 4096)
-	n, err := conn.Read(buf)
+	data, err := readResponse(conn)
 	if err != nil {
 		return nil, 0, fmt.Errorf("read response: %w", err)
 	}
 	ping := time.Since(start)
 
-	data := buf[:n]
-
-	if n < 5 {
-		return nil, 0, fmt.Errorf("response too short: %d bytes", n)
+	if len(data) < 1 {
+		return nil, 0, fmt.Errorf("response too short")
 	}
 
-	if data[4] == challengeResponse {
-		if n < 9 {
-			return nil, 0, fmt.Errorf("challenge response too short: %d bytes", n)
+	if data[0] == challengeResponse {
+		if len(data) < 5 {
+			return nil, 0, fmt.Errorf("challenge response too short: %d bytes", len(data))
 		}
-		challenge := data[5:9]
+		challenge := data[1:5]
 		retryPayload := make([]byte, len(a2sInfoPayload), len(a2sInfoPayload)+4)
 		copy(retryPayload, a2sInfoPayload)
 		retryPayload = append(retryPayload, challenge...)
@@ -113,19 +203,18 @@ func queryInfo(conn net.Conn) (*protocol.ServerInfo, time.Duration, error) {
 			return nil, 0, fmt.Errorf("send challenge response: %w", err)
 		}
 
-		n, err = conn.Read(buf)
+		data, err = readResponse(conn)
 		if err != nil {
 			return nil, 0, fmt.Errorf("read challenge reply: %w", err)
 		}
 		ping = time.Since(start)
-		data = buf[:n]
 	}
 
-	if data[4] != a2sInfoResponse {
-		return nil, 0, fmt.Errorf("unexpected response type: 0x%02x", data[4])
+	if len(data) < 1 || data[0] != a2sInfoResponse {
+		return nil, 0, fmt.Errorf("unexpected response type: 0x%02x", data[0])
 	}
 
-	info, err := parseInfoResponse(data[5:])
+	info, err := parseInfoResponse(data[1:])
 	return info, ping, err
 }
 
@@ -201,7 +290,7 @@ func parseInfoResponse(data []byte) (*protocol.ServerInfo, error) {
 			readString(r)             // skip spectator name
 		}
 		if edf&0x20 != 0 {
-			readString(r) // skip keywords
+			info.Keywords, _ = readString(r)
 		}
 		if edf&0x01 != 0 {
 			var gameID uint64
@@ -227,16 +316,13 @@ func queryPlayers(conn net.Conn) ([]protocol.PlayerInfo, error) {
 		return nil, fmt.Errorf("send player challenge: %w", err)
 	}
 
-	buf := make([]byte, 4096)
-	n, err := conn.Read(buf)
+	data, err := readResponse(conn)
 	if err != nil {
 		return nil, fmt.Errorf("read player challenge: %w", err)
 	}
 
-	data := buf[:n]
-
-	if n >= 9 && data[4] == challengeResponse {
-		challenge := data[5:9]
+	if len(data) >= 5 && data[0] == challengeResponse {
+		challenge := data[1:5]
 		playerReq := []byte{0xFF, 0xFF, 0xFF, 0xFF, a2sPlayerRequest}
 		playerReq = append(playerReq, challenge...)
 
@@ -244,18 +330,17 @@ func queryPlayers(conn net.Conn) ([]protocol.PlayerInfo, error) {
 			return nil, fmt.Errorf("send player request: %w", err)
 		}
 
-		n, err = conn.Read(buf)
+		data, err = readResponse(conn)
 		if err != nil {
 			return nil, fmt.Errorf("read player response: %w", err)
 		}
-		data = buf[:n]
 	}
 
-	if len(data) < 6 || data[4] != a2sPlayerResponse {
-		return nil, fmt.Errorf("unexpected player response type")
+	if len(data) < 2 || data[0] != a2sPlayerResponse {
+		return nil, fmt.Errorf("unexpected player response type: 0x%02x", data[0])
 	}
 
-	return parsePlayerResponse(data[5:])
+	return parsePlayerResponse(data[1:])
 }
 
 func parsePlayerResponse(data []byte) ([]protocol.PlayerInfo, error) {

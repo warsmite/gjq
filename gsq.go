@@ -344,6 +344,7 @@ func enrichResult(info *ServerInfo, gc *GameConfig) {
 	info.Name = sanitize(info.Name)
 	info.Map = sanitize(info.Map)
 	info.Version = sanitize(info.Version)
+	info.Keywords = sanitize(info.Keywords)
 	info.ServerType = sanitize(info.ServerType)
 	info.Environment = sanitize(info.Environment)
 	info.Visibility = sanitize(info.Visibility)
