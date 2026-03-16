@@ -330,39 +330,48 @@ func parseInfoResponse(data []byte) (*protocol.ServerInfo, error) {
 	return info, nil
 }
 
-func queryPlayers(conn net.Conn) ([]protocol.PlayerInfo, error) {
-	// Send initial request with 0xFFFFFFFF challenge to get the real challenge
-	challengeReq := []byte{0xFF, 0xFF, 0xFF, 0xFF, a2sPlayerRequest, 0xFF, 0xFF, 0xFF, 0xFF}
+// challengeQuery performs the A2S challenge-response handshake used by both
+// A2S_PLAYER and A2S_RULES. Returns the response payload after the type byte.
+func challengeQuery(conn net.Conn, requestByte, responseByte byte) ([]byte, error) {
+	challengeReq := []byte{0xFF, 0xFF, 0xFF, 0xFF, requestByte, 0xFF, 0xFF, 0xFF, 0xFF}
 
 	if _, err := conn.Write(challengeReq); err != nil {
-		return nil, fmt.Errorf("send player challenge: %w", err)
+		return nil, fmt.Errorf("send challenge: %w", err)
 	}
 
 	data, err := readResponse(conn)
 	if err != nil {
-		return nil, fmt.Errorf("read player challenge: %w", err)
+		return nil, fmt.Errorf("read challenge: %w", err)
 	}
 
 	if len(data) >= 5 && data[0] == challengeResponse {
 		challenge := data[1:5]
-		playerReq := []byte{0xFF, 0xFF, 0xFF, 0xFF, a2sPlayerRequest}
-		playerReq = append(playerReq, challenge...)
+		req := []byte{0xFF, 0xFF, 0xFF, 0xFF, requestByte}
+		req = append(req, challenge...)
 
-		if _, err := conn.Write(playerReq); err != nil {
-			return nil, fmt.Errorf("send player request: %w", err)
+		if _, err := conn.Write(req); err != nil {
+			return nil, fmt.Errorf("send request: %w", err)
 		}
 
 		data, err = readResponse(conn)
 		if err != nil {
-			return nil, fmt.Errorf("read player response: %w", err)
+			return nil, fmt.Errorf("read response: %w", err)
 		}
 	}
 
-	if len(data) < 2 || data[0] != a2sPlayerResponse {
-		return nil, fmt.Errorf("unexpected player response type: 0x%02x", data[0])
+	if len(data) < 2 || data[0] != responseByte {
+		return nil, fmt.Errorf("unexpected response type: 0x%02x (expected 0x%02x)", data[0], responseByte)
 	}
 
-	return parsePlayerResponse(data[1:])
+	return data[1:], nil
+}
+
+func queryPlayers(conn net.Conn) ([]protocol.PlayerInfo, error) {
+	data, err := challengeQuery(conn, a2sPlayerRequest, a2sPlayerResponse)
+	if err != nil {
+		return nil, fmt.Errorf("a2s_player: %w", err)
+	}
+	return parsePlayerResponse(data)
 }
 
 func parsePlayerResponse(data []byte) ([]protocol.PlayerInfo, error) {
@@ -376,24 +385,26 @@ func parsePlayerResponse(data []byte) ([]protocol.PlayerInfo, error) {
 	players := make([]protocol.PlayerInfo, 0, playerCount)
 
 	for i := 0; i < int(playerCount); i++ {
-		var index uint8
-		if err := binary.Read(r, binary.LittleEndian, &index); err != nil {
+		if _, err := r.ReadByte(); err != nil { // index byte (unused but part of wire format)
+			slog.Warn("a2s_player: truncated response", "expected", playerCount, "parsed", i)
 			break
 		}
-		_ = index
 
 		name, err := readString(r)
 		if err != nil {
+			slog.Warn("a2s_player: truncated response", "expected", playerCount, "parsed", i)
 			break
 		}
 
 		var score int32
 		if err := binary.Read(r, binary.LittleEndian, &score); err != nil {
+			slog.Warn("a2s_player: truncated response", "expected", playerCount, "parsed", i)
 			break
 		}
 
 		var duration float32
 		if err := binary.Read(r, binary.LittleEndian, &duration); err != nil {
+			slog.Warn("a2s_player: truncated response", "expected", playerCount, "parsed", i)
 			break
 		}
 
@@ -408,38 +419,11 @@ func parsePlayerResponse(data []byte) ([]protocol.PlayerInfo, error) {
 }
 
 func queryRules(conn net.Conn) (map[string]string, error) {
-	// Send initial request with 0xFFFFFFFF challenge to get the real challenge
-	challengeReq := []byte{0xFF, 0xFF, 0xFF, 0xFF, a2sRulesRequest, 0xFF, 0xFF, 0xFF, 0xFF}
-
-	if _, err := conn.Write(challengeReq); err != nil {
-		return nil, fmt.Errorf("send rules challenge: %w", err)
-	}
-
-	data, err := readResponse(conn)
+	data, err := challengeQuery(conn, a2sRulesRequest, a2sRulesResponse)
 	if err != nil {
-		return nil, fmt.Errorf("read rules challenge: %w", err)
+		return nil, fmt.Errorf("a2s_rules: %w", err)
 	}
-
-	if len(data) >= 5 && data[0] == challengeResponse {
-		challenge := data[1:5]
-		rulesReq := []byte{0xFF, 0xFF, 0xFF, 0xFF, a2sRulesRequest}
-		rulesReq = append(rulesReq, challenge...)
-
-		if _, err := conn.Write(rulesReq); err != nil {
-			return nil, fmt.Errorf("send rules request: %w", err)
-		}
-
-		data, err = readResponse(conn)
-		if err != nil {
-			return nil, fmt.Errorf("read rules response: %w", err)
-		}
-	}
-
-	if len(data) < 3 || data[0] != a2sRulesResponse {
-		return nil, fmt.Errorf("unexpected rules response type: 0x%02x", data[0])
-	}
-
-	return parseRulesResponse(data[1:])
+	return parseRulesResponse(data)
 }
 
 func parseRulesResponse(data []byte) (map[string]string, error) {
@@ -455,10 +439,12 @@ func parseRulesResponse(data []byte) (map[string]string, error) {
 	for i := 0; i < int(ruleCount); i++ {
 		name, err := readString(r)
 		if err != nil {
+			slog.Warn("a2s_rules: truncated response", "expected", ruleCount, "parsed", i)
 			break
 		}
 		value, err := readString(r)
 		if err != nil {
+			slog.Warn("a2s_rules: truncated response", "expected", ruleCount, "parsed", i)
 			break
 		}
 		rules[name] = value
