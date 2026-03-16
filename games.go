@@ -76,7 +76,7 @@ var gameRegistry = []GameConfig{
 	{Slug: "garrys-mod", Name: "Garry's Mod", Aliases: []string{"gmod"}, AppID: 4000, DefaultGamePort: 27015, DefaultQueryPort: 27015, Protocol: "source"},
 	{Slug: "team-fortress-2", Name: "Team Fortress 2", Aliases: []string{"tf2"}, AppID: 440, DefaultGamePort: 27015, DefaultQueryPort: 27015, Protocol: "source"},
 	{Slug: "conan-exiles", Name: "Conan Exiles", Aliases: []string{"conan"}, AppID: 440900, DefaultGamePort: 7777, DefaultQueryPort: 27015, Protocol: "source"},
-	{Slug: "7-days-to-die", Name: "7 Days to Die", Aliases: []string{"7dtd"}, AppID: 251570, DefaultGamePort: 26900, DefaultQueryPort: 26900, Protocol: "source"},
+	{Slug: "7-days-to-die", Name: "7 Days to Die", Aliases: []string{"7dtd", "7d2d"}, AppID: 251570, DefaultGamePort: 26900, DefaultQueryPort: 26900, Protocol: "source"},
 	{Slug: "hell-let-loose", Name: "Hell Let Loose", Aliases: []string{"hll"}, AppID: 686810, DefaultGamePort: 7777, DefaultQueryPort: 7778, Protocol: "source"},
 	{Slug: "enshrouded", Name: "Enshrouded", Aliases: []string{}, AppID: 1203620, DefaultGamePort: 15636, DefaultQueryPort: 15637, Protocol: "source"},
 	{Slug: "v-rising", Name: "V Rising", Aliases: []string{"vrising"}, AppID: 1604030, DefaultGamePort: 9876, DefaultQueryPort: 9877, Protocol: "source"},
