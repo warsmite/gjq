@@ -99,6 +99,14 @@ func Get(name string) (Querier, error) {
 	return q, nil
 }
 
+// Truncate returns s truncated to n characters with "..." appended if needed.
+func Truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
+}
+
 func All() map[string]Querier {
 	cp := make(map[string]Querier, len(registry))
 	for k, v := range registry {

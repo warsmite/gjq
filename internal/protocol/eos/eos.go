@@ -124,7 +124,7 @@ func postForToken(ctx context.Context, endpoint, basicAuth string, body url.Valu
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, truncate(string(respBody), 200))
+		return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, protocol.Truncate(string(respBody), 200))
 	}
 
 	var result struct {
@@ -184,7 +184,7 @@ func findSession(ctx context.Context, cfg *protocol.EOSConfig, token, address st
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, truncate(string(respBody), 200))
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, protocol.Truncate(string(respBody), 200))
 	}
 
 	var envelope struct {
@@ -222,12 +222,6 @@ func findSession(ctx context.Context, cfg *protocol.EOSConfig, token, address st
 				return session, nil
 			}
 		}
-	}
-
-	if len(sessions) == 1 {
-		// Only one session for this IP — likely the right one even if port doesn't match
-		slog.Debug("eos: single session found, using it despite port mismatch")
-		return sessions[0], nil
 	}
 
 	return nil, fmt.Errorf("no session found for %s:%d (%d sessions at this address)", address, port, len(sessions))
@@ -348,9 +342,3 @@ func jsonInt(session map[string]json.RawMessage, keys ...string) int {
 	return jsonInt(nested, keys[1:]...)
 }
 
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n] + "..."
-}

@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/0xkowalskidev/gsq/internal/protocol"
@@ -59,7 +60,7 @@ func (q *tshockQuerier) Query(ctx context.Context, address string, port uint16, 
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("tshock HTTP %d: %s", resp.StatusCode, truncate(string(body), 200))
+		return nil, fmt.Errorf("tshock HTTP %d: %s", resp.StatusCode, protocol.Truncate(string(body), 200))
 	}
 
 	var status statusResponse
@@ -119,34 +120,17 @@ func splitPlayers(s string) []string {
 	start := 0
 	for i := 0; i < len(s); i++ {
 		if s[i] == ',' {
-			p := trim(s[start:i])
+			p := strings.TrimSpace(s[start:i])
 			if p != "" {
 				players = append(players, p)
 			}
 			start = i + 1
 		}
 	}
-	p := trim(s[start:])
+	p := strings.TrimSpace(s[start:])
 	if p != "" {
 		players = append(players, p)
 	}
 	return players
 }
 
-func trim(s string) string {
-	start, end := 0, len(s)
-	for start < end && s[start] == ' ' {
-		start++
-	}
-	for end > start && s[end-1] == ' ' {
-		end--
-	}
-	return s[start:end]
-}
-
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n] + "..."
-}
