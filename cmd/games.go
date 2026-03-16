@@ -18,7 +18,6 @@ func NewGamesCmd() *cobra.Command {
 			// Build combined game column: "slug (alias1, alias2)" or just "slug"
 			gameLabels := make([]string, len(games))
 			gameWidth := len("GAME")
-			supWidth := len("SUPPORTS")
 			for i, g := range games {
 				if len(g.Aliases) > 0 {
 					gameLabels[i] = fmt.Sprintf("%s (%s)", g.Slug, strings.Join(g.Aliases, ", "))
@@ -28,29 +27,23 @@ func NewGamesCmd() *cobra.Command {
 				if len(gameLabels[i]) > gameWidth {
 					gameWidth = len(gameLabels[i])
 				}
-				s := strings.Join(g.Supports, ", ")
-				if len(s) > supWidth {
-					supWidth = len(s)
-				}
 			}
 			gameWidth += 2
-			supWidth += 2
 
-			fmtStr := fmt.Sprintf("%%-%ds %%-10s %%-12s %%-10s %%-%ds %%s\n", gameWidth, supWidth)
+			fmtStr := fmt.Sprintf("%%-%ds %%-10s %%-12s %%-10s %%s\n", gameWidth)
 
-			fmt.Printf(fmtStr, "GAME", "GAME PORT", "QUERY PORT", "PROTOCOL", "SUPPORTS", "NOTES")
-			fmt.Printf(fmtStr, strings.Repeat("-", gameWidth-2), "---------", "----------", "--------", strings.Repeat("-", supWidth-2), "-----")
+			fmt.Printf(fmtStr, "GAME", "GAME PORT", "QUERY PORT", "PROTOCOL", "SUPPORTS")
+			fmt.Printf(fmtStr, strings.Repeat("-", gameWidth-2), "---------", "----------", "--------", "--------")
 
 			for i, g := range games {
 				sup := "-"
 				if len(g.Supports) > 0 {
 					sup = strings.Join(g.Supports, ", ")
 				}
-				notes := "-"
+				fmt.Printf(fmt.Sprintf("%%-%ds %%-10d %%-12d %%-10s %%s\n", gameWidth), gameLabels[i], g.DefaultGamePort, g.DefaultQueryPort, g.Protocol, sup)
 				if g.Notes != "" {
-					notes = g.Notes
+					fmt.Printf("Notes: %s\n\n", g.Notes)
 				}
-				fmt.Printf(fmt.Sprintf("%%-%ds %%-10d %%-12d %%-10s %%-%ds %%s\n", gameWidth, supWidth), gameLabels[i], g.DefaultGamePort, g.DefaultQueryPort, g.Protocol, sup, notes)
 			}
 
 			return nil
