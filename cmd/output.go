@@ -4,16 +4,58 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/0xkowalskidev/gsq"
 )
 
+var sanitizeRe = regexp.MustCompile(strings.Join([]string{
+	`§[0-9a-fk-or]`,  // Minecraft color/formatting codes
+	`\x1b\[[0-9;]*m`, // ANSI escape sequences
+	`<[^>]+>`,         // HTML/Unity rich text tags
+	`\^[0-9]`,         // Quake-style color codes
+	`[\x00-\x1f]`,     // Control characters
+	`\s{2,}`,          // Collapse runs of whitespace
+}, "|"))
+
+func sanitize(s string) string {
+	return strings.TrimSpace(sanitizeRe.ReplaceAllStringFunc(s, func(m string) string {
+		if m[0] == ' ' || m[0] == '\t' {
+			return " "
+		}
+		return ""
+	}))
+}
+
+// sanitizeInfo cleans display strings on a copy so library consumers get raw data.
+func sanitizeInfo(info *gsq.ServerInfo) *gsq.ServerInfo {
+	out := *info
+	out.Name = sanitize(out.Name)
+	out.Game = sanitize(out.Game)
+	out.Map = sanitize(out.Map)
+	out.GameMode = sanitize(out.GameMode)
+	out.Version = sanitize(out.Version)
+	out.Keywords = sanitize(out.Keywords)
+	out.ServerType = sanitize(out.ServerType)
+	out.Environment = sanitize(out.Environment)
+	out.Visibility = sanitize(out.Visibility)
+	if len(out.PlayerList) > 0 {
+		out.PlayerList = make([]gsq.PlayerInfo, len(info.PlayerList))
+		copy(out.PlayerList, info.PlayerList)
+		for i := range out.PlayerList {
+			out.PlayerList[i].Name = sanitize(out.PlayerList[i].Name)
+		}
+	}
+	return &out
+}
+
 func printServerInfo(info *gsq.ServerInfo, asJSON bool) error {
 	if asJSON {
 		return printJSON(info)
 	}
-	printTable(info)
+	printTable(sanitizeInfo(info))
 	return nil
 }
 
@@ -25,7 +67,7 @@ func printMultiServerInfo(servers []*gsq.ServerInfo, asJSON bool) error {
 		if i > 0 {
 			fmt.Println()
 		}
-		printTable(s)
+		printTable(sanitizeInfo(s))
 	}
 	return nil
 }

@@ -6,8 +6,6 @@ import (
 	"log/slog"
 	"math"
 	"net"
-	"regexp"
-	"strings"
 	"sync"
 
 	"github.com/0xkowalskidev/gsq/internal/protocol"
@@ -351,39 +349,9 @@ func enrichResult(info *ServerInfo, gc *GameConfig) {
 			}
 			info.Extra["gameNotes"] = gc.Notes
 		}
-	} else {
-		info.Game = sanitize(info.Game)
-	}
-	info.Name = sanitize(info.Name)
-	info.Map = sanitize(info.Map)
-	info.GameMode = sanitize(info.GameMode)
-	info.Version = sanitize(info.Version)
-	info.Keywords = sanitize(info.Keywords)
-	info.ServerType = sanitize(info.ServerType)
-	info.Environment = sanitize(info.Environment)
-	info.Visibility = sanitize(info.Visibility)
-	for i := range info.PlayerList {
-		info.PlayerList[i].Name = sanitize(info.PlayerList[i].Name)
 	}
 }
 
-var sanitizeRe = regexp.MustCompile(strings.Join([]string{
-	`§[0-9a-fk-or]`,  // Minecraft color/formatting codes
-	`\x1b\[[0-9;]*m`, // ANSI escape sequences
-	`<[^>]+>`,         // HTML/Unity rich text tags
-	`\^[0-9]`,         // Quake-style color codes
-	`[\x00-\x1f]`,     // Control characters
-	`\s{2,}`,          // Collapse runs of whitespace
-}, "|"))
-
-func sanitize(s string) string {
-	return strings.TrimSpace(sanitizeRe.ReplaceAllStringFunc(s, func(m string) string {
-		if m[0] == ' ' || m[0] == '\t' {
-			return " "
-		}
-		return ""
-	}))
-}
 
 func resolveHost(ctx context.Context, address string) (string, error) {
 	if net.ParseIP(address) != nil {
