@@ -69,7 +69,10 @@ func (q *tshockQuerier) Query(ctx context.Context, address string, port uint16, 
 	}
 
 	ping := time.Since(start)
+	return mapStatus(status, port, ping, opts.Players), nil
+}
 
+func mapStatus(status statusResponse, port uint16, ping time.Duration, players bool) *protocol.ServerInfo {
 	name := status.Name
 	if name == "" {
 		name = status.World
@@ -103,7 +106,7 @@ func (q *tshockQuerier) Query(ctx context.Context, address string, port uint16, 
 		}
 	}
 
-	if opts.Players && status.Players != "" {
+	if players && status.Players != "" {
 		for _, name := range splitPlayers(status.Players) {
 			if name != "" {
 				info.PlayerList = append(info.PlayerList, protocol.PlayerInfo{Name: name})
@@ -111,7 +114,7 @@ func (q *tshockQuerier) Query(ctx context.Context, address string, port uint16, 
 		}
 	}
 
-	return info, nil
+	return info
 }
 
 // splitPlayers splits the comma-separated player string from the /status endpoint.
