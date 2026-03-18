@@ -3,16 +3,16 @@ package gjq
 import "github.com/0xkowalskidev/gjq/protocol"
 
 type GameConfig struct {
-	Slug             string
-	Name             string
-	Aliases          []string
-	AppID            uint32
-	DefaultGamePort  uint16
-	DefaultQueryPort uint16
-	Protocol         string
-	ProtocolConfig   any      // protocol-specific config (e.g. *protocol.EOSConfig), nil for most games
-	Supports         []string // optional features: "players", "rules", "keywords", "mods"
-	Notes            string   // limitations/quirks shown in `gjq games` and JSON output
+	Slug             string   `json:"slug"`
+	Name             string   `json:"name"`
+	Aliases          []string `json:"aliases,omitempty"`
+	AppID            uint32   `json:"appId,omitempty"`
+	DefaultGamePort  uint16   `json:"defaultGamePort"`
+	DefaultQueryPort uint16   `json:"defaultQueryPort"`
+	Protocol         string   `json:"protocol"`
+	ProtocolConfig   any      `json:"-"`                  // protocol-specific config (e.g. *protocol.EOSConfig), nil for most games
+	Supports         []string `json:"supports,omitempty"` // optional features: "players", "rules", "keywords", "mods"
+	Notes            string   `json:"notes,omitempty"`    // limitations/quirks shown in `gjq games` and JSON output
 }
 
 func (g *GameConfig) HasSupport(feature string) bool {

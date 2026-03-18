@@ -93,7 +93,7 @@ func NewRootCmd() *cobra.Command {
 	}
 
 	rootCmd.Flags().StringVar(&flagGame, "game", "", "game slug to skip auto-detection (e.g. cs2, minecraft)")
-	rootCmd.Flags().BoolVar(&flagJSON, "json", false, "output as JSON")
+	rootCmd.PersistentFlags().BoolVar(&flagJSON, "json", false, "output as JSON")
 	rootCmd.Flags().DurationVar(&flagTimeout, "timeout", 5*time.Second, "query timeout")
 	rootCmd.Flags().BoolVar(&flagPlayers, "players", false, "fetch player list")
 	rootCmd.Flags().BoolVar(&flagRules, "rules", false, "fetch server rules/cvars")

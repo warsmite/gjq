@@ -9,11 +9,15 @@ import (
 )
 
 func NewGamesCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "games",
 		Short: "List supported games",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			games := gjq.SupportedGames()
+
+			if flagJSON {
+				return printJSON(games)
+			}
 
 			// Build combined game column: "slug (alias1, alias2)" or just "slug"
 			gameLabels := make([]string, len(games))
@@ -49,4 +53,6 @@ func NewGamesCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	return cmd
 }
