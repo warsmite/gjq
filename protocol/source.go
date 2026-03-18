@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net"
 	"sort"
 	"strconv"
@@ -412,6 +413,13 @@ func parsePlayerResponse(data []byte) ([]PlayerInfo, error) {
 			break
 		}
 
+		// Garbage float32 values (NaN, Inf, negative) at truncation boundaries
+		// produce impossible durations like math.MinInt64 nanoseconds.
+		if math.IsNaN(float64(duration)) || math.IsInf(float64(duration), 0) || duration < 0 {
+			slog.Warn("a2s_player: invalid duration, likely truncated data", "expected", playerCount, "parsed", i)
+			break
+		}
+
 		players = append(players, PlayerInfo{
 			Name:     name,
 			Score:    int(score),
@@ -446,6 +454,15 @@ func parseRulesResponse(data []byte) (map[string]string, error) {
 			slog.Warn("a2s_rules: truncated response", "expected", ruleCount, "parsed", i)
 			break
 		}
+
+		// Empty keys or keys with control characters indicate misaligned reads
+		// at a truncation boundary where coincidental 0x00 bytes act as fake
+		// null terminators.
+		if name == "" || containsControlChar(name) {
+			slog.Warn("a2s_rules: invalid key, likely truncated data", "expected", ruleCount, "parsed", i)
+			break
+		}
+
 		value, err := readNullTermString(r)
 		if err != nil {
 			slog.Warn("a2s_rules: truncated response", "expected", ruleCount, "parsed", i)
@@ -455,6 +472,15 @@ func parseRulesResponse(data []byte) (map[string]string, error) {
 	}
 
 	return rules, nil
+}
+
+func containsControlChar(s string) bool {
+	for _, b := range []byte(s) {
+		if b < 0x20 {
+			return true
+		}
+	}
+	return false
 }
 
 // readNullTermString reads a null-terminated string from a bytes.Reader.
