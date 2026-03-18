@@ -48,6 +48,52 @@ servers, err := gjq.Discover(ctx, "192.168.1.100", gjq.DiscoverOptions{})
 
 `gjq scan` / `gjq.Discover` probes ports to find game servers on a host. Primarily intended for localhost — results over the network may be unreliable with large port ranges.
 
+## Response Format
+
+### ServerInfo
+
+| Field | Type | JSON | Notes |
+|-------|------|------|-------|
+| Protocol | string | `protocol` | Protocol used: `source`, `minecraft`, `raknet`, `eos`, `tshock` |
+| Name | string | `name` | Server name or MOTD |
+| Map | string | `map` | Current map |
+| Game | string | `game` | Game name, matched from the game registry — not server-reported |
+| GameMode | string | `gameMode` | Game mode (Bedrock only) |
+| Players | int | `players` | Current player count |
+| MaxPlayers | int | `maxPlayers` | Maximum player slots |
+| Bots | int | `bots` | Bot count |
+| ServerType | string | `serverType` | `dedicated`, `non-dedicated`, or `proxy` (Source only) |
+| Environment | string | `environment` | OS: `linux`, `windows`, `mac` (Source only) |
+| Visibility | string | `visibility` | `public` or `private` |
+| VAC | bool | `vac` | VAC enabled (Source only) |
+| Version | string | `version` | Server/game version string |
+| Keywords | string | `keywords` | Comma-separated tags set by the server (Source only) |
+| AppID | uint32 | `appId` | Steam AppID (Source only) |
+| Ping | duration | `ping` | Round-trip query time |
+| Address | string | `address` | Address as provided by the user |
+| GamePort | uint16 | `gamePort` | User-provided port — may not be the actual game port |
+| ReportedGamePort | uint16 | `reportedGamePort` | Game port server thinks it's running on, unreliable |
+| QueryPort | uint16 | `queryPort` | Port that responded to the query — always accurate |
+| PlayerList | []PlayerInfo | `playerList` | Requires `--players`. Not all games support this |
+| Rules | map[string]string | `rules` | Server cvars/rules. Requires `--rules` (Source only) |
+| Mods | []ModInfo | `mods` | Mod list (Minecraft Java only) |
+| Extra | map[string]any | `extra` | Protocol-specific data (steamId, edition, folder, etc.) |
+
+### PlayerInfo
+
+| Field | Type | JSON | Notes |
+|-------|------|------|-------|
+| Name | string | `name` | Player name. EOS returns opaque IDs instead of names |
+| Score | int | `score` | Player score (Source only, 0 for other protocols) |
+| Duration | duration | `duration` | Time connected (Source only) |
+
+### ModInfo
+
+| Field | Type | JSON | Notes |
+|-------|------|------|-------|
+| ID | string | `id` | Mod identifier |
+| Version | string | `version` | Mod version |
+
 ## EOS (Epic Online Services)
 
 Some games (ARK: Survival Ascended, Palworld, Squad, The Isle: EVRIMA) use Epic's matchmaking API instead of a direct query protocol. gjq ships with default credentials, but game updates may rotate them.
