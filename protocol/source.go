@@ -9,6 +9,8 @@ import (
 	"log/slog"
 	"net"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -311,6 +313,7 @@ func parseInfoResponse(data []byte) (*ServerInfo, error) {
 		}
 		if edf&0x20 != 0 {
 			info.Keywords, _ = readNullTermString(r)
+			parseKeywordPlayerCounts(info)
 		}
 		if edf&0x01 != 0 {
 			var gameID uint64
@@ -497,4 +500,24 @@ func visibilityString(b uint8) string {
 		return "public"
 	}
 	return "private"
+}
+
+// parseKeywordPlayerCounts parses cp (current players) and mp (max players)
+// tags from the keywords string. Rust servers use these because the A2S_INFO
+// binary fields are uint8 and overflow at 255.
+func parseKeywordPlayerCounts(info *ServerInfo) {
+	for _, tag := range strings.Split(info.Keywords, ",") {
+		tag = strings.TrimSpace(tag)
+		if v, ok := strings.CutPrefix(tag, "cp"); ok {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				slog.Debug("a2s: keyword tag override", "field", "players", "old", info.Players, "new", n)
+				info.Players = n
+			}
+		} else if v, ok := strings.CutPrefix(tag, "mp"); ok {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				slog.Debug("a2s: keyword tag override", "field", "maxPlayers", "old", info.MaxPlayers, "new", n)
+				info.MaxPlayers = n
+			}
+		}
+	}
 }
