@@ -1,6 +1,6 @@
 # gjq - GameJanitor Query
 
-Query game servers from the command line or Go code. Supports 30+ games across Source engine, Minecraft (Java & Bedrock), EOS, and TShock protocols, with auto-detection and host scanning.
+Query game servers from the command line or Go code. Supports 75+ games across Source engine, Minecraft (Java & Bedrock), EOS, and TShock protocols, with auto-detection and host scanning.
 
 ## Install
 
@@ -11,21 +11,20 @@ go install github.com/0xkowalskidev/gjq/cmd/gjq@latest
 ## Usage
 
 ```bash
-gjq --game rust 192.168.1.100:28017          # game + query port (fastest)
-gjq 192.168.1.100:28017                      # auto-detect protocol
-gjq --game rust 192.168.1.100                # infer default query port from game
-gjq 192.168.1.100:28015                      # auto-detect with port derivation
-gjq --direct 192.168.1.100:28017             # skip port derivation, query exact port
+gjq --game rust 192.168.1.100:28015          # query by game (derives query port)
+gjq --game rust 192.168.1.100                # omit port to use game's default
+gjq 192.168.1.100:27015                      # auto-detect protocol and game
+gjq --direct 192.168.1.100:28017             # exact query port, auto-detect protocol
+gjq --protocol source 192.168.1.100:28017    # exact query port, force protocol
 gjq --players --game ark 192.168.1.100:27015 # include player list
 gjq --rules --game tf2 192.168.1.100:27015   # include server rules/cvars
-gjq --protocol source 192.168.1.100:28017    # force protocol, expects query port
 gjq --json --game minecraft play.hypixel.net # JSON output
-gjq games                                    # list supported games, ports, and capabilities
+gjq games --json                             # list supported games as JSON
 gjq scan 192.168.1.100                       # find servers on known query ports
 gjq scan --ports 25000-26000 192.168.1.100   # scan a custom port range
 ```
 
-> **Tip:** Use `--direct` when you know the exact query port. This skips all port derivation and gives the fastest, most predictable result.
+`--protocol` is useful for querying games not yet in the registry — any A2S game works with `--protocol source`.
 
 Not all games support every flag — `gjq games` shows what each game supports. Using an incompatible flag with `--game` will error immediately rather than timing out.
 
