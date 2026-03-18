@@ -226,6 +226,68 @@ func TestParseInfoResponseEDF(t *testing.T) {
 	})
 }
 
+func TestParseKeywordPlayerCounts(t *testing.T) {
+	// Rust-style: uint8 fields wrap at 255, real counts in keyword tags
+	base := buildInfoResponse("Rust Server", "Procedural Map", "rust", "Rust",
+		0, 94, 224, 0, 'd', 'l', 0, 1, "2024.1.1")
+
+	t.Run("cp and mp tags override uint8 fields", func(t *testing.T) {
+		data := appendEDF(base, 0x20, 0, 0, 0, "", "mp350,cp224,born1234567", 0)
+		info, err := parseInfoResponse(data)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if info.Players != 224 {
+			t.Errorf("Players = %d, want 224", info.Players)
+		}
+		if info.MaxPlayers != 350 {
+			t.Errorf("MaxPlayers = %d, want 350", info.MaxPlayers)
+		}
+	})
+
+	t.Run("only mp tag", func(t *testing.T) {
+		data := appendEDF(base, 0x20, 0, 0, 0, "", "mp250,oxide", 0)
+		info, err := parseInfoResponse(data)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if info.Players != 94 {
+			t.Errorf("Players = %d, want 94 (unchanged)", info.Players)
+		}
+		if info.MaxPlayers != 250 {
+			t.Errorf("MaxPlayers = %d, want 250", info.MaxPlayers)
+		}
+	})
+
+	t.Run("no cp/mp tags leaves fields unchanged", func(t *testing.T) {
+		data := appendEDF(base, 0x20, 0, 0, 0, "", "oxide,modded,monthly", 0)
+		info, err := parseInfoResponse(data)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if info.Players != 94 {
+			t.Errorf("Players = %d, want 94", info.Players)
+		}
+		if info.MaxPlayers != 224 {
+			t.Errorf("MaxPlayers = %d, want 224", info.MaxPlayers)
+		}
+	})
+
+	t.Run("invalid tag values ignored", func(t *testing.T) {
+		data := appendEDF(base, 0x20, 0, 0, 0, "", "cpABC,mp0,cp-5", 0)
+		info, err := parseInfoResponse(data)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if info.Players != 94 {
+			t.Errorf("Players = %d, want 94 (unchanged)", info.Players)
+		}
+		if info.MaxPlayers != 224 {
+			t.Errorf("MaxPlayers = %d, want 224 (unchanged)", info.MaxPlayers)
+		}
+	})
+}
+
 // buildPlayerResponse constructs an A2S_PLAYER response payload (after type byte).
 func buildPlayerResponse(players []struct {
 	name     string

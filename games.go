@@ -94,7 +94,7 @@ var gameRegistry = []GameConfig{
 	{Slug: "counter-strike", Name: "Counter-Strike 1.6", Aliases: []string{"cs16", "cs"}, AppID: 10, DefaultGamePort: 27015, DefaultQueryPort: 27015, Protocol: "source", Supports: sourceSupports},
 	{Slug: "counter-strike-source", Name: "Counter-Strike: Source", Aliases: []string{"css"}, AppID: 240, DefaultGamePort: 27015, DefaultQueryPort: 27015, Protocol: "source", Supports: sourceSupports},
 	{Slug: "counter-strike-go", Name: "Counter-Strike: GO", Aliases: []string{"csgo"}, AppID: 730, DefaultGamePort: 27015, DefaultQueryPort: 27015, Protocol: "source", Supports: sourceSupports},
-	{Slug: "rust", Name: "Rust", Aliases: []string{}, AppID: 252490, DefaultGamePort: 28015, DefaultQueryPort: 28017, Protocol: "source", Supports: sourceSupports},
+	{Slug: "rust", Name: "Rust", Aliases: []string{}, AppID: 252490, DefaultGamePort: 28015, DefaultQueryPort: 28017, Protocol: "source", Supports: sourceSupports, Notes: "Player counts may exceed 255; real values come from cp/mp keyword tags."},
 	{Slug: "ark-survival-evolved", Name: "ARK: Survival Evolved", Aliases: []string{"ark", "ase"}, AppID: 346110, DefaultGamePort: 7777, DefaultQueryPort: 27015, Protocol: "source", Supports: sourceSupports},
 	{Slug: "valheim", Name: "Valheim", Aliases: []string{}, AppID: 892970, DefaultGamePort: 2456, DefaultQueryPort: 2457, Protocol: "source", Supports: sourceSupports},
 	{Slug: "dayz", Name: "DayZ", Aliases: []string{}, AppID: 221100, DefaultGamePort: 2302, DefaultQueryPort: 2303, Protocol: "source", Supports: sourceSupports},
