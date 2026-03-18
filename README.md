@@ -4,8 +4,20 @@ Query game servers from the command line or Go code. Supports 75+ games across S
 
 ## Install
 
+**Prebuilt binary:**
+```bash
+curl -sSL https://raw.githubusercontent.com/0xkowalskidev/gjq/master/install.sh | sh
+```
+
+**Go:**
 ```bash
 go install github.com/0xkowalskidev/gjq/cmd/gjq@latest
+```
+
+**Nix:**
+```bash
+nix run github:0xkowalskidev/gjq         # run without installing
+nix profile install github:0xkowalskidev/gjq  # install to profile
 ```
 
 ## Usage
