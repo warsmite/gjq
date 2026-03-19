@@ -413,11 +413,10 @@ func parsePlayerResponse(data []byte) ([]PlayerInfo, error) {
 			break
 		}
 
-		// Garbage float32 values (NaN, Inf, negative) at truncation boundaries
-		// produce impossible durations like math.MinInt64 nanoseconds.
-		if math.IsNaN(float64(duration)) || math.IsInf(float64(duration), 0) || duration < 0 {
-			slog.Debug("a2s_player: invalid duration, likely truncated data", "expected", playerCount, "parsed", i)
-			break
+		// Garbage float32 values (NaN, Inf, negative, overflow) from truncated or
+		// corrupt data can produce impossible durations like math.MinInt64 nanoseconds.
+		if math.IsNaN(float64(duration)) || math.IsInf(float64(duration), 0) || duration < 0 || duration > 365*24*3600 {
+			duration = 0
 		}
 
 		players = append(players, PlayerInfo{
