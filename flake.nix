@@ -20,7 +20,7 @@
             pname = "gjq";
             version = "0.1.0";
             src = ./.;
-            vendorHash = "sha256-7K17JaXFsjf163g5PXCb5ng2gYdotnZ2IDKk8KFjNj0=";
+            vendorHash = "sha256-KPSU7vSNvGS+TJgRuCStur0AbaRph4OS5Z50qeCJYAQ=";
             subPackages = [ "cmd/gjq" ];
 
             meta = {
@@ -33,6 +33,13 @@
       devShells = forAllSystems (system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
+
+          update-vendor-hash = pkgs.writeShellScriptBin "update-vendor-hash" ''
+            go mod vendor
+            HASH=$(nix hash path --type sha256 vendor/)
+            sed -i "s|vendorHash = \".*\"|vendorHash = \"$HASH\"|" flake.nix
+            echo "Updated vendorHash to $HASH"
+          '';
         in
         {
           default = pkgs.mkShell {
@@ -40,6 +47,7 @@
               go
               gopls
               gotools
+              update-vendor-hash
             ];
 
             shellHook = ''

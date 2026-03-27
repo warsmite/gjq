@@ -5,3 +5,5 @@ toadd.txt
 result
 dist/
 /vendor
+.direnv
+.envrc
